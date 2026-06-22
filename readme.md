@@ -6,57 +6,142 @@ Never miss a rating update again. CPSync fetches upcoming schedules from **Codef
 
 ---
 
-## ✨ Key Features
+## ✨ Features
 
-* **📅 Automated Calendar Sync:** Creates Google Calendar events for upcoming contests with direct links.
-* **🌍 Multi-Platform Aggregation:** Supports Codeforces (API), LeetCode (GraphQL), CodeChef (API), and AtCoder (HTML Scraping).
-* **🔐 Secure Authentication:** Google OAuth2 login flow with seamless JWT session management.
-* **🛡️ Enterprise-Grade Security:** Google Access and Refresh tokens are encrypted at rest using AES-256-GCM.
-* **⚡ High Performance:** Implements Caffeine caching to prevent API rate-limiting and ensure fast contest retrieval.
-* **🤖 Background Scheduling:** Automated daily CRON jobs run at 3:00 AM to sync new contests for all active users.
-* **📈 Smart Monitoring:** Built-in Fetcher Health Monitor tracks scraping/API health and logs anomalies.
+- 📅 **Automated Google Calendar Sync**
+    - Creates calendar events for upcoming contests with direct contest links.
+    - Prevents duplicate event creation.
+
+- 🌍 **Multi-Platform Contest Aggregation**
+    - **Codeforces** (Official API)
+    - **LeetCode** (GraphQL)
+    - **CodeChef** (API)
+    - **AtCoder** (JSoup HTML Scraping)
+
+- 🔐 **Secure Authentication**
+    - Google OAuth2 Login
+    - JWT-based session management
+
+- 🛡️ **Enterprise-Grade Security**
+    - Google Access & Refresh Tokens encrypted using **AES-256-GCM**
+    - Secure token refresh mechanism
+
+- ⚡ **High Performance**
+    - Caffeine caching minimizes API requests
+    - Faster contest retrieval with reduced rate limiting
+
+- 🤖 **Background Synchronization**
+    - Scheduled CRON job runs every day at **3:00 AM**
+    - Automatically syncs contests for all active users
+
+- 📈 **Smart Monitoring**
+    - Fetcher Health Monitor detects API/scraping failures
+    - Logs anomalies for easier debugging
 
 ---
 
-## 🛠️ Technology Stack
+# 🛠️ Technology Stack
 
 | Category | Technologies |
-| :--- | :--- |
+|------------|-----------------------------------------------|
 | **Core** | Java 21, Spring Boot 3.x |
-| **Data & Persistence** | PostgreSQL, Spring Data JPA, Flyway DB Migrations |
-| **Security** | Spring Security, OAuth2 Client, JJWT, Java Cryptography Extension (AES-256-GCM) |
-| **Integrations** | Google Calendar API v3, JSoup (Web Scraping), Spring RestClient |
+| **Database** | PostgreSQL, Spring Data JPA, Flyway |
+| **Security** | Spring Security, OAuth2 Client, JJWT, AES-256-GCM |
+| **Integrations** | Google Calendar API v3, JSoup, Spring RestClient |
 | **Performance** | Caffeine Cache, Spring Scheduling |
 
 ---
 
-## 🏗️ System Architecture & Workflow
+# 🏗️ System Architecture
 
-1.  **Authentication Flow:** Users authenticate via Google OAuth2 (`prompt=consent` for offline access). The backend stores an encrypted Refresh Token and issues a JWT to the frontend.
-2.  **Data Ingestion:** `ContestFetcher` implementations pull upcoming contests from respective platforms. Results are temporarily stored in local Caffeine caches to minimize external API load.
-3.  **Synchronization Engine:** When triggered (manually or via the nightly CRON job), the `SyncService` determines user preferences, checks the `synced_events` database table to prevent duplicates, and pushes new events to the Google Calendar API.
-4.  **Token Management:** The `GoogleTokenRefreshService` automatically handles expired access tokens before attempting calendar operations.
+```
+                    Google OAuth2
+                           │
+                           ▼
+                    Authentication
+                           │
+                           ▼
+                    JWT Generation
+                           │
+                           ▼
+                      Spring Boot API
+                           │
+        ┌──────────────────┼──────────────────┐
+        │                  │                  │
+        ▼                  ▼                  ▼
+ Contest Fetchers     User Preferences   Sync Service
+        │                  │                  │
+        └──────────────┬───┴──────────────────┘
+                       ▼
+              Google Calendar API
+                       │
+                       ▼
+                User Google Calendar
+```
 
 ---
 
-## 🚀 Getting Started
+# ⚙️ Workflow
 
-### Prerequisites
+### 1. Authentication
 
-* **Java 21** or higher
-* **Maven** 3.9+
-* **PostgreSQL** database (Local or Cloud, e.g., Neon)
-* **Google Cloud Console** project with:
-    * OAuth 2.0 Client IDs configured (Web application).
-    * Google Calendar API enabled.
+- User signs in using Google OAuth2 (`prompt=consent`)
+- Backend securely stores encrypted Refresh Token
+- JWT is generated and returned to the frontend
 
-### Environment Variables
+### 2. Contest Fetching
 
-Create an `application-local.properties` file or export the following variables to your environment:
+Each platform has its own `ContestFetcher` implementation.
+
+Data Sources:
+
+- Codeforces API
+- LeetCode GraphQL
+- CodeChef API
+- AtCoder HTML Scraper
+
+Contest data is cached using **Caffeine Cache** to reduce external API calls.
+
+### 3. Synchronization
+
+When synchronization is triggered:
+
+- Load user platform preferences
+- Fetch upcoming contests
+- Check `synced_events` table
+- Skip duplicate events
+- Create new Google Calendar events
+
+### 4. Token Management
+
+If the Google Access Token expires:
+
+- Refresh Token is automatically used
+- New Access Token is generated
+- Calendar operation continues seamlessly
+
+---
+
+# 🚀 Getting Started
+
+## Prerequisites
+
+- Java 21+
+- Maven 3.9+
+- PostgreSQL
+- Google Cloud Project
+- Google Calendar API Enabled
+- OAuth2 Client Credentials
+
+---
+
+# 🔧 Environment Variables
+
+Create an `application-local.properties` file or export the following environment variables.
 
 ```properties
 # Database Configuration
-DB_HOST=jdbc:postgresql://<your-db-host>:<port>/<dbname>
+DB_HOST=jdbc:postgresql://<your-db-host>:<port>/<database>
 DB_USERNAME=your_db_user
 DB_PASSWORD=your_db_password
 
@@ -64,60 +149,205 @@ DB_PASSWORD=your_db_password
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
 
-# Security Keys
-JWT_SECRET=a_very_long_secure_random_base64_string_for_jwt
-TOKEN_ENCRYPTION_KEY=a_32_byte_base64_encoded_string_for_aes_gcm
+# JWT Secret
+JWT_SECRET=a_very_long_secure_random_base64_string
 
-Note: The TOKEN_ENCRYPTION_KEY must be a valid base64-encoded 256-bit (32-byte) key.
+# AES-256-GCM Encryption Key
+TOKEN_ENCRYPTION_KEY=a_32_byte_base64_encoded_string
+```
 
-Installation & Execution
-
-1. git clone [https://github.com/yourusername/cpsync-backend.git](https://github.com/yourusername/cpsync-backend.git)
-    cd cpsync-backend
-    ```
-
-2.  **Build the project:**
-```bash
-    ./mvnw clean install
-    ```
-
-3.  **Run the application:**
-```bash
-    ./mvnw spring-boot:run
-    ```
-
-Flyway will automatically initialize the database schema on startup. The application will be available at `http://localhost:8080`.
+> **Note:** `TOKEN_ENCRYPTION_KEY` must be a valid Base64-encoded 256-bit (32-byte) key.
 
 ---
 
-## 📡 API Reference
+# 📦 Installation
 
-All `/api/**` endpoints (except public contest fetches) require a valid `Authorization: Bearer <JWT>` header.
+## 1. Clone the Repository
 
-### Authentication & User
-* `GET /oauth2/authorization/google` - Initiates Google OAuth2 login flow.
-* `GET /api/user/profile` - Fetches the current user's profile and preferences.
-* `PUT /api/user/platforms` - Updates user's enabled competitive programming platforms.
-* `PUT /api/user/pause` - Temporarily halts background calendar syncing.
-* `PUT /api/user/resume` - Resumes background calendar syncing.
+```bash
+git clone https://github.com/yourusername/cpsync-backend.git
 
-### Contests & Sync
-* `GET /api/contests` - Fetches all upcoming contests across all platforms (Public).
-* `POST /api/sync` - Manually triggers a Google Calendar sync for the authenticated user.
+cd cpsync-backend
+```
 
 ---
 
-## 📂 Project Structure
+## 2. Build the Project
+
+```bash
+./mvnw clean install
+```
+
+---
+
+## 3. Run the Application
+
+```bash
+./mvnw spring-boot:run
+```
+
+---
+
+Flyway automatically initializes the database schema during startup.
+
+Application URL:
+
+```
+http://localhost:8080
+```
+
+---
+
+# 📡 API Reference
+
+## Authentication
+
+| Method | Endpoint | Description |
+|------------|-----------------------------------------|--------------------------------|
+| GET | `/oauth2/authorization/google` | Start Google OAuth2 Login |
+
+---
+
+## User APIs
+
+| Method | Endpoint | Description |
+|------------|-------------------------|------------------------------------|
+| GET | `/api/user/profile` | Get logged-in user profile |
+| PUT | `/api/user/platforms` | Update enabled platforms |
+| PUT | `/api/user/pause` | Pause automatic synchronization |
+| PUT | `/api/user/resume` | Resume automatic synchronization |
+
+---
+
+## Contest APIs
+
+| Method | Endpoint | Description |
+|------------|------------------|--------------------------------|
+| GET | `/api/contests` | Fetch upcoming contests (Public) |
+| POST | `/api/sync` | Trigger manual Google Calendar sync |
+
+---
+
+> All `/api/**` endpoints (except `/api/contests`) require:
+
+```
+Authorization: Bearer <JWT_TOKEN>
+```
+
+---
+
+# 📂 Project Structure
 
 ```text
-src/main/java/com/cpsync/cpsync_backend/
-├── config/         # Security, Cache, and OAuth2 configurations
-├── controller/     # REST API endpoints
-├── dto/            # Data Transfer Objects (Requests & Responses)
-├── exception/      # Global Exception Handling
-├── model/          # JPA Entities (User, SyncedEvent, Platform Preferences)
-├── repository/     # Spring Data JPA Repositories
-├── scheduler/      # CRON jobs for background tasks
-├── security/       # JWT Filters and OAuth2 Success Handlers
-└── service/        # Business logic 
-    └── impl/       # Platform-specific fetchers (Codeforces, LeetCode, etc.)
+src/
+└── main/
+    └── java/
+        └── com/
+            └── cpsync/
+                └── cpsync_backend/
+                    ├── config/
+                    │   ├── Cache Configuration
+                    │   ├── OAuth2 Configuration
+                    │   └── Security Configuration
+                    │
+                    ├── controller/
+                    │   └── REST API Endpoints
+                    │
+                    ├── dto/
+                    │   └── Request & Response DTOs
+                    │
+                    ├── exception/
+                    │   └── Global Exception Handling
+                    │
+                    ├── model/
+                    │   ├── User
+                    │   ├── SyncedEvent
+                    │   └── Platform Preferences
+                    │
+                    ├── repository/
+                    │   └── Spring Data JPA Repositories
+                    │
+                    ├── scheduler/
+                    │   └── Daily CRON Jobs
+                    │
+                    ├── security/
+                    │   ├── JWT Filters
+                    │   └── OAuth2 Success Handlers
+                    │
+                    └── service/
+                        ├── Contest Services
+                        ├── Sync Services
+                        ├── Google Services
+                        └── impl/
+                            ├── CodeforcesFetcher
+                            ├── LeetCodeFetcher
+                            ├── CodeChefFetcher
+                            └── AtCoderFetcher
+```
+
+---
+
+# 🔒 Security Highlights
+
+- ✅ Google OAuth2 Authentication
+- ✅ JWT Authorization
+- ✅ AES-256-GCM Token Encryption
+- ✅ Automatic Google Access Token Refresh
+- ✅ Duplicate Calendar Event Prevention
+- ✅ Platform Preference-Based Synchronization
+
+---
+
+# ⚡ Performance Optimizations
+
+- Caffeine In-Memory Cache
+- Scheduled Background Jobs
+- Cached Contest Fetching
+- Minimal External API Calls
+- Efficient Database Queries
+- Duplicate Sync Detection
+
+---
+
+# 📅 Supported Platforms
+
+| Platform | Source |
+|----------------|----------------|
+| Codeforces | Official API |
+| LeetCode | GraphQL |
+| CodeChef | API |
+| AtCoder | JSoup HTML Scraping |
+
+---
+
+# 🤝 Contributing
+
+1. Fork the repository
+
+2. Create a feature branch
+
+```bash
+git checkout -b feature/my-feature
+```
+
+3. Commit your changes
+
+```bash
+git commit -m "Add new feature"
+```
+
+4. Push the branch
+
+```bash
+git push origin feature/my-feature
+```
+
+5. Open a Pull Request
+
+---
+
+# 📄 License
+
+This project is released under the **MIT License**.
+
+Feel free to use, modify, and distribute it for personal or commercial purposes.
