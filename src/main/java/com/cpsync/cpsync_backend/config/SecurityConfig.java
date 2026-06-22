@@ -40,6 +40,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/oauth2/**", "/login/**").permitAll()
                         .requestMatchers("/api/contests/**").permitAll()
+                        .requestMatchers("/api/request-access").permitAll()
                         .requestMatchers("/api/me", "/api/login-success", "/api/whoami").permitAll()
                         .requestMatchers("/actuator/health").permitAll()   // health check for Fly.io
                         .anyRequest().authenticated()
