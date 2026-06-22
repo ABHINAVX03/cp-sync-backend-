@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/sync")
 public class SyncController {
@@ -21,7 +23,7 @@ public class SyncController {
     }
 
     @PostMapping
-    public String triggerManualSync(Authentication authentication) {
+    public Map<String, Object> triggerManualSync(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
 
         User user = userRepository.findById(userId)
@@ -29,6 +31,9 @@ public class SyncController {
 
         int syncedCount = syncService.syncContestsForUser(user);
 
-        return "Synced " + syncedCount + " new contest(s) to your calendar.";
+        return Map.of(
+                "status", "ok",
+                "syncedCount", syncedCount
+        );
     }
 }

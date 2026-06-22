@@ -5,6 +5,7 @@ import com.cpsync.cpsync_backend.service.UserService;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
@@ -26,7 +27,8 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     private final UserService userService;
     private final JwtUtil jwtUtil;
 
-    private static final String FRONTEND_CALLBACK_URL = "http://localhost:3000/auth/callback";
+    @Value("${app.frontend.url:https://cp-sync-frontend.vercel.app/auth/callback}")
+    private String frontendCallbackUrl;
 
     public OAuth2LoginSuccessHandler(OAuth2AuthorizedClientService authorizedClientService,
                                      UserService userService,
@@ -70,6 +72,6 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
         String jwt = jwtUtil.generateToken(savedUser.getId(), savedUser.getEmail());
 
-        response.sendRedirect(FRONTEND_CALLBACK_URL + "?token=" + jwt);
+        response.sendRedirect(frontendCallbackUrl + "?token=" + jwt);
     }
 }
