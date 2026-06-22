@@ -115,4 +115,29 @@ public class UserService {
         user.setActive(active);
         return userRepository.save(user);
     }
+
+    public String getEmailById(Long userId) {
+        return userRepository.findById(userId)
+                .map(User::getEmail)
+                .orElse(null);
+    }
+
+    public List<UserProfileResponse> getAllUserProfiles() {
+        return userRepository.findAll().stream()
+                .map(user -> {
+                    List<String> platforms = platformPreferenceRepository
+                            .findByUserIdAndEnabledTrue(user.getId())
+                            .stream()
+                            .map(pref -> pref.getPlatform().name())
+                            .collect(Collectors.toList());
+                    return new UserProfileResponse(
+                            user.getId(),
+                            user.getEmail(),
+                            user.getName(),
+                            user.isActive(),
+                            platforms
+                    );
+                })
+                .collect(Collectors.toList());
+    }
 }
