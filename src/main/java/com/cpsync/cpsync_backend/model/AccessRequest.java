@@ -27,4 +27,6 @@ public class AccessRequest {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
     }
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
 }
