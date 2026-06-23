@@ -1,0 +1,1 @@
+ALTER TABLE access_requests ADD CONSTRAINT uq_access_requests_email UNIQUE (email);

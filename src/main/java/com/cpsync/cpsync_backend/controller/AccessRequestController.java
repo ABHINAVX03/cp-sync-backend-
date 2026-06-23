@@ -19,9 +19,13 @@ public class AccessRequestController {
         if (request.getEmail() == null || !request.getEmail().contains("@")) {
             return "Invalid email address.";
         }
-        // Save to database – you can view them later via logs or a simple query
+
+        // Check if email already exists
+        if (accessRequestRepository.existsByEmail(request.getEmail())) {
+            return "You've already requested access. We'll activate your account soon.";
+        }
+
         accessRequestRepository.save(request);
-        // Log the email so you can see it immediately in Render's logs
         System.out.println("New access request: " + request.getEmail());
         return "Your request has been received. We'll activate your account within 12 hours.";
     }
