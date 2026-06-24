@@ -52,15 +52,16 @@ public class SyncService {
 
         List<ContestDto> contests = aggregatorService.fetchContestsForPlatforms(enabledPlatforms);
 
+        // One query for all of this user's already-synced contest keys, instead of
+        // one existsBy... query per contest.
+        Set<String> alreadySyncedKeys = syncedEventRepository.findContestKeysByUserId(user.getId());
+
         int syncedCount = 0;
 
         for (ContestDto contest : contests) {
             String contestKey = contest.getContestKey();
 
-            boolean alreadySynced = syncedEventRepository
-                    .existsByUserIdAndContestKey(user.getId(), contestKey);
-
-            if (alreadySynced) {
+            if (alreadySyncedKeys.contains(contestKey)) {
                 continue;
             }
 

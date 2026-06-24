@@ -20,7 +20,7 @@ public class GoogleTokenRefreshService {
 
     private static final String TOKEN_URL = "https://oauth2.googleapis.com/token";
 
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient ;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final UserRepository userRepository;
@@ -29,11 +29,13 @@ public class GoogleTokenRefreshService {
     private final String clientSecret;
 
     public GoogleTokenRefreshService(
+            RestClient.Builder restClientBuilder,
             UserRepository userRepository,
             TokenEncryptionService tokenEncryptionService,
             @Value("${spring.security.oauth2.client.registration.google.client-id}") String clientId,
             @Value("${spring.security.oauth2.client.registration.google.client-secret}") String clientSecret
     ) {
+        this.restClient = restClientBuilder.build();
         this.userRepository = userRepository;
         this.tokenEncryptionService = tokenEncryptionService;
         this.clientId = clientId;

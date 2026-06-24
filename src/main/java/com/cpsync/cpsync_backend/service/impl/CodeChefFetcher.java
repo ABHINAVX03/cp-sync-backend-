@@ -21,9 +21,12 @@ public class CodeChefFetcher implements ContestFetcher {
 
     private static final String API_URL = "https://www.codechef.com/api/list/contests/all";
 
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    public CodeChefFetcher(RestClient.Builder restClientBuilder) {
+        this.restClient = restClientBuilder.build();
+    }
     @Override
     public Platform getPlatform() {
         return Platform.CODECHEF;

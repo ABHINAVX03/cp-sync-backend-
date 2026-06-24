@@ -18,8 +18,12 @@ public class CodeforcesFetcher implements ContestFetcher {
 
     private static final String API_URL = "https://codeforces.com/api/contest.list?gym=false";
 
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public CodeforcesFetcher(RestClient.Builder restClientBuilder) {
+        this.restClient = restClientBuilder.build();
+    }
 
     @Override
     public Platform getPlatform() {

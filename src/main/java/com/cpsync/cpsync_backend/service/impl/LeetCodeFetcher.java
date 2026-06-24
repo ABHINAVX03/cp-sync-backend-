@@ -31,9 +31,12 @@ public class LeetCodeFetcher implements ContestFetcher {
         }
         """;
 
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    public LeetCodeFetcher(RestClient.Builder restClientBuilder) {
+        this.restClient = restClientBuilder.build();
+    }
     @Override
     public Platform getPlatform() {
         return Platform.LEETCODE;

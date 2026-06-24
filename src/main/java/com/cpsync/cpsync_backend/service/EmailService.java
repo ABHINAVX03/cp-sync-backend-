@@ -10,8 +10,11 @@ import java.util.Map;
 @Service
 public class EmailService {
 
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient;
 
+    public EmailService(RestClient.Builder restClientBuilder) {
+        this.restClient = restClientBuilder.build();
+    }
     @Value("${sendgrid.api-key:}")
     private String apiKey;
 
