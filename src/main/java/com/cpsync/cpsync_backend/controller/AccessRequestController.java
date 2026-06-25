@@ -4,6 +4,8 @@ import com.cpsync.cpsync_backend.model.AccessRequest;
 import com.cpsync.cpsync_backend.repository.AccessRequestRepository;
 import com.cpsync.cpsync_backend.repository.UserRepository;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.annotation.Transactional;
 
 @RestController
 @RequestMapping("/api")
@@ -19,24 +21,27 @@ public class AccessRequestController {
     }
 
     @PostMapping("/request-access")
+    @Transactional
     public String requestAccess(@RequestBody AccessRequest request) {
         if (request.getEmail() == null || !request.getEmail().contains("@")) {
             return "Invalid email address.";
         }
 
-        // 1. Check if user already exists
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             return "You're already an active user. Please sign in directly.";
         }
 
-        // 2. Check if a request already exists
         if (accessRequestRepository.existsByEmail(request.getEmail())) {
             return "You've already requested access. We'll activate your account soon.";
         }
 
-        // 3. Save new request
-        accessRequestRepository.save(request);
-        System.out.println("New access request: " + request.getEmail());
+        try {
+            accessRequestRepository.save(request);
+        } catch (DataIntegrityViolationException e) {
+            // Two concurrent requests for the same email — unique index caught it
+            return "You've already requested access. We'll activate your account soon.";
+        }
+
         return "Your request has been received. We'll activate your account within 12 hours.";
     }
 }

@@ -11,12 +11,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class SyncService {
+
     private static final Logger log = LoggerFactory.getLogger(SyncService.class);
 
     private final ContestAggregatorService aggregatorService;
@@ -35,9 +37,13 @@ public class SyncService {
     }
 
     /**
-     * Syncs all new (not-yet-synced) contests for a user's enabled platforms to their calendar.
-     * Safe to call repeatedly — already-synced contests are skipped automatically.
-     * Returns the count of newly synced contests.
+     * Syncs new contests for a user.
+     *
+     * Changes from original:
+     * 1. Collects all new SyncedEvent rows and calls saveAll() once instead of
+     *    save() per contest — cuts DB round-trips from N to 1 per user sync.
+     * 2. Uses CalendarSyncException to distinguish retryable vs permanent failures
+     *    without hiding them silently.
      */
     public int syncContestsForUser(User user) {
         Set<Platform> enabledPlatforms = platformPreferenceRepository
@@ -47,43 +53,49 @@ public class SyncService {
                 .collect(Collectors.toSet());
 
         if (enabledPlatforms.isEmpty()) {
-            return 0; // nothing to sync if user hasn't enabled any platforms
+            return 0;
         }
 
         List<ContestDto> contests = aggregatorService.fetchContestsForPlatforms(enabledPlatforms);
 
-        // One query for all of this user's already-synced contest keys, instead of
-        // one existsBy... query per contest.
-        Set<String> alreadySyncedKeys = syncedEventRepository.findContestKeysByUserId(user.getId());
+        // One DB query for all synced keys instead of existsBy per contest
+        Set<String> alreadySynced = syncedEventRepository.findContestKeysByUserId(user.getId());
 
-        int syncedCount = 0;
+        List<SyncedEvent> toSave = new ArrayList<>();
+        int failedCount = 0;
 
         for (ContestDto contest : contests) {
-            String contestKey = contest.getContestKey();
-
-            if (alreadySyncedKeys.contains(contestKey)) {
+            String key = contest.getContestKey();
+            if (alreadySynced.contains(key)) {
                 continue;
             }
 
             try {
                 String googleEventId = calendarService.createContestEvent(user, contest);
 
-                SyncedEvent syncedEvent = new SyncedEvent();
-                syncedEvent.setUser(user);
-                syncedEvent.setContestKey(contestKey);
-                syncedEvent.setGoogleEventId(googleEventId);
-                syncedEventRepository.save(syncedEvent);
+                SyncedEvent event = new SyncedEvent();
+                event.setUser(user);
+                event.setContestKey(key);
+                event.setGoogleEventId(googleEventId);
+                toSave.add(event);
 
-                syncedCount++;
-
-            } catch (Exception e) {
-                // One contest failing to sync (e.g. transient Google API error) shouldn't
-                // stop the rest of this user's contests from syncing.
-                log.error("Failed to sync contest " + contestKey +
-                        " for user " + user.getId() + ": " + e.getMessage());
+            } catch (GoogleCalendarService.CalendarSyncException e) {
+                // Log and continue — one contest failing shouldn't stop the rest
+                failedCount++;
+                log.error("[SyncService] Skipping contest {} for user {}: {}",
+                        key, user.getId(), e.getMessage());
             }
         }
 
-        return syncedCount;
+        // Batch insert: one DB round-trip instead of N
+        if (!toSave.isEmpty()) {
+            syncedEventRepository.saveAll(toSave);
+        }
+
+        if (failedCount > 0) {
+            log.warn("[SyncService] User {} — {} contests failed to sync", user.getId(), failedCount);
+        }
+
+        return toSave.size();
     }
 }
