@@ -7,6 +7,7 @@ import com.cpsync.cpsync_backend.model.User;
 import com.cpsync.cpsync_backend.model.UserPlatformPreference;
 import com.cpsync.cpsync_backend.repository.SyncedEventRepository;
 import com.cpsync.cpsync_backend.repository.UserPlatformPreferenceRepository;
+import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,7 @@ public class SyncService {
      * 2. Uses CalendarSyncException to distinguish retryable vs permanent failures
      *    without hiding them silently.
      */
+    @Transactional
     public int syncContestsForUser(User user) {
         Set<Platform> enabledPlatforms = platformPreferenceRepository
                 .findByUserIdAndEnabledTrue(user.getId())

@@ -3,9 +3,7 @@ package com.cpsync.cpsync_backend.service;
 import com.cpsync.cpsync_backend.model.User;
 import com.cpsync.cpsync_backend.repository.UserRepository;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -20,8 +18,8 @@ public class GoogleTokenRefreshService {
 
     private static final String TOKEN_URL = "https://oauth2.googleapis.com/token";
 
-    private final RestClient restClient ;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final RestClient restClient;
+    private final ObjectMapper objectMapper;
 
     private final UserRepository userRepository;
     private final TokenEncryptionService tokenEncryptionService;
@@ -32,12 +30,14 @@ public class GoogleTokenRefreshService {
             RestClient.Builder restClientBuilder,
             UserRepository userRepository,
             TokenEncryptionService tokenEncryptionService,
+            ObjectMapper objectMapper,
             @Value("${spring.security.oauth2.client.registration.google.client-id}") String clientId,
             @Value("${spring.security.oauth2.client.registration.google.client-secret}") String clientSecret
     ) {
         this.restClient = restClientBuilder.build();
         this.userRepository = userRepository;
         this.tokenEncryptionService = tokenEncryptionService;
+        this.objectMapper = objectMapper;
         this.clientId = clientId;
         this.clientSecret = clientSecret;
     }

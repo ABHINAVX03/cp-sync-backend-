@@ -1,5 +1,7 @@
 package com.cpsync.cpsync_backend.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -9,6 +11,8 @@ import java.util.Map;
 
 @Service
 public class EmailService {
+
+    private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
     private final RestClient restClient;
 
@@ -23,7 +27,7 @@ public class EmailService {
 
     public void sendWelcomeEmail(String toEmail) {
         if (apiKey == null || apiKey.isBlank()) {
-            System.err.println("SendGrid API key not configured");
+            log.warn("[EmailService] SendGrid API key not configured -- welcome email skipped");
             return;
         }
 
@@ -59,7 +63,7 @@ public class EmailService {
                     .retrieve()
                     .toBodilessEntity();
         } catch (Exception e) {
-            System.err.println("Failed to send welcome email: " + e.getMessage());
+            log.error("[EmailService] Failed to send welcome email to {}: {}", toEmail, e.getMessage(), e);
         }
     }
 }

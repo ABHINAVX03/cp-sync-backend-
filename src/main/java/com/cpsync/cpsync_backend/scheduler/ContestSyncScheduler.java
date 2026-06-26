@@ -56,7 +56,7 @@ public class ContestSyncScheduler {
      *   - 50 users/batch × ~500KB per sync = ~25MB per batch peak
      *   - Well within limits even at 2k total users (40 batches × 25MB sequential)
      */
-    @Scheduled(cron = "0 0 3 * * *")
+    @Scheduled(cron = "0 0 3 * * *", zone = "UTC")
     public void runDailySync() {
         log.info("[Scheduler] Starting daily sync (batch-size={}, pause={}ms)",
                 batchSize, batchPauseMs);

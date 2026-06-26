@@ -1,9 +1,9 @@
 package com.cpsync.cpsync_backend.controller;
 
 import com.cpsync.cpsync_backend.model.User;
-import com.cpsync.cpsync_backend.repository.UserRepository;
 import com.cpsync.cpsync_backend.service.SyncRateLimiter;
 import com.cpsync.cpsync_backend.service.SyncService;
+import com.cpsync.cpsync_backend.service.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -18,14 +18,14 @@ import java.util.Map;
 public class SyncController {
 
     private final SyncService syncService;
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final SyncRateLimiter rateLimiter;
 
     public SyncController(SyncService syncService,
-                          UserRepository userRepository,
+                          UserService userService,
                           SyncRateLimiter rateLimiter) {
         this.syncService = syncService;
-        this.userRepository = userRepository;
+        this.userService = userService;
         this.rateLimiter = rateLimiter;
     }
 
@@ -33,7 +33,6 @@ public class SyncController {
     public ResponseEntity<Map<String, Object>> triggerManualSync(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
 
-        // Check rate limit before doing any DB or Calendar work
         if (!rateLimiter.tryConsume(userId)) {
             long retryAfter = rateLimiter.secondsUntilRefill(userId);
             return ResponseEntity
@@ -45,14 +44,9 @@ public class SyncController {
                     ));
         }
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
+        User user = userService.getUserById(userId);
         int syncedCount = syncService.syncContestsForUser(user);
 
-        return ResponseEntity.ok(Map.of(
-                "status", "ok",
-                "syncedCount", syncedCount
-        ));
+        return ResponseEntity.ok(Map.of("status", "ok", "syncedCount", syncedCount));
     }
 }

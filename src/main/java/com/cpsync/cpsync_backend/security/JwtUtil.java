@@ -2,7 +2,6 @@ package com.cpsync.cpsync_backend.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -34,7 +33,7 @@ public class JwtUtil {
                 .claim("email", email)
                 .issuedAt(now)
                 .expiration(expiry)
-                .signWith(signingKey, SignatureAlgorithm.HS256)
+                .signWith(signingKey, Jwts.SIG.HS256)
                 .compact();
     }
 

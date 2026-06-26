@@ -39,4 +39,9 @@ public class FetcherHealthMonitor {
                     platform, streak, previousGood.get());
         }
     }
+
+    public int getConsecutiveEmptyStreak(Platform platform) {
+        AtomicInteger streak = consecutiveEmptyCount.get(platform);
+        return streak != null ? streak.get() : 0;
+    }
 }

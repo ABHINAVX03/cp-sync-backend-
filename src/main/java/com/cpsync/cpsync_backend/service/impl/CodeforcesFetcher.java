@@ -4,7 +4,9 @@ import com.cpsync.cpsync_backend.dto.ContestDto;
 import com.cpsync.cpsync_backend.model.Platform;
 import com.cpsync.cpsync_backend.service.ContestFetcher;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.cache.annotation.Cacheable;
@@ -17,12 +19,13 @@ import java.util.stream.Collectors;
 public class CodeforcesFetcher implements ContestFetcher {
 
     private static final String API_URL = "https://codeforces.com/api/contest.list?gym=false";
-
+    private static final Logger log = LoggerFactory.getLogger(CodeforcesFetcher.class);
     private final RestClient restClient;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
-    public CodeforcesFetcher(RestClient.Builder restClientBuilder) {
+    public CodeforcesFetcher(RestClient.Builder restClientBuilder, ObjectMapper objectMapper) {
         this.restClient = restClientBuilder.build();
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -51,7 +54,7 @@ public class CodeforcesFetcher implements ContestFetcher {
                     .collect(Collectors.toList());
 
         } catch (Exception e) {
-            // Don't let one platform's failure break the whole sync run for other platforms
+            log.error("[{}] Fetch failed: {}", getPlatform(), e.getMessage(), e);
             return Collections.emptyList();
         }
     }

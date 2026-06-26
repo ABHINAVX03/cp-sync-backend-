@@ -16,9 +16,11 @@ import java.util.Collections;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final UserDenyList userDenyList;
 
-    public JwtAuthFilter(JwtUtil jwtUtil) {
+    public JwtAuthFilter(JwtUtil jwtUtil, UserDenyList userDenyList) {
         this.jwtUtil = jwtUtil;
+        this.userDenyList = userDenyList;
     }
 
     @Override
@@ -32,15 +34,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
             if (jwtUtil.isTokenValid(token)) {
                 Long userId = jwtUtil.extractUserId(token);
-                String email = jwtUtil.extractEmail(token);
 
-                var authToken = new UsernamePasswordAuthenticationToken(
-                        userId, // principal — we'll use this to look up the User later
-                        null,
-                        Collections.emptyList() // no roles/authorities needed yet
-                );
-
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                // FIXED: reject tokens belonging to deactivated users
+                if (!userDenyList.isDenied(userId)) {
+                    var authToken = new UsernamePasswordAuthenticationToken(
+                            userId,
+                            null,
+                            Collections.emptyList()
+                    );
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
         }
 

@@ -7,9 +7,11 @@ import com.cpsync.cpsync_backend.model.UserPlatformPreference;
 import com.cpsync.cpsync_backend.repository.UserPlatformPreferenceRepository;
 import com.cpsync.cpsync_backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -20,6 +22,7 @@ public class UserService {
     private final UserPlatformPreferenceRepository platformPreferenceRepository;
     private final TokenEncryptionService tokenEncryptionService;
 
+
     public UserService(UserRepository userRepository,
                        UserPlatformPreferenceRepository platformPreferenceRepository,
                        TokenEncryptionService tokenEncryptionService) {
@@ -28,6 +31,7 @@ public class UserService {
         this.tokenEncryptionService = tokenEncryptionService;
     }
 
+    @Transactional
     public User upsertUserFromLogin(
             String googleId,
             String email,
@@ -75,6 +79,12 @@ public class UserService {
         );
     }
 
+    public User getUserById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+    }
+
+    @Transactional
     public UserProfileResponse updatePlatforms(Long userId, List<String> platformNames) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
@@ -123,21 +133,25 @@ public class UserService {
     }
 
     public List<UserProfileResponse> getAllUserProfiles() {
-        return userRepository.findAll().stream()
-                .map(user -> {
-                    List<String> platforms = platformPreferenceRepository
-                            .findByUserIdAndEnabledTrue(user.getId())
-                            .stream()
-                            .map(pref -> pref.getPlatform().name())
-                            .collect(Collectors.toList());
-                    return new UserProfileResponse(
-                            user.getId(),
-                            user.getEmail(),
-                            user.getName(),
-                            user.isActive(),
-                            platforms
-                    );
-                })
+        List<User> users = userRepository.findAll();
+
+        // 1 query instead of N queries -- group by userId
+        Map<Long, List<String>> platformsByUser = platformPreferenceRepository
+                .findAllEnabledWithUser()
+                .stream()
+                .collect(Collectors.groupingBy(
+                        p -> p.getUser().getId(),
+                        Collectors.mapping(p -> p.getPlatform().name(), Collectors.toList())
+                ));
+
+        return users.stream()
+                .map(user -> new UserProfileResponse(
+                        user.getId(),
+                        user.getEmail(),
+                        user.getName(),
+                        user.isActive(),
+                        platformsByUser.getOrDefault(user.getId(), List.of())
+                ))
                 .collect(Collectors.toList());
     }
 }

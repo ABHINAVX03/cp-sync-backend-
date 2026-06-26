@@ -5,7 +5,9 @@ import com.cpsync.cpsync_backend.model.Platform;
 import com.cpsync.cpsync_backend.service.ContestFetcher;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.cache.annotation.Cacheable;
@@ -14,18 +16,20 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
 public class CodeChefFetcher implements ContestFetcher {
 
     private static final String API_URL = "https://www.codechef.com/api/list/contests/all";
-
+    private static final Logger log = LoggerFactory.getLogger(CodeChefFetcher.class);
     private final RestClient restClient;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
-    public CodeChefFetcher(RestClient.Builder restClientBuilder) {
+    public CodeChefFetcher(RestClient.Builder restClientBuilder, ObjectMapper objectMapper) {
         this.restClient = restClientBuilder.build();
+        this.objectMapper = objectMapper;
     }
     @Override
     public Platform getPlatform() {
@@ -50,10 +54,11 @@ public class CodeChefFetcher implements ContestFetcher {
 
             return parsed.futureContests.stream()
                     .map(this::toContestDto)
-                    .filter(c -> c != null)
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toList());
 
         } catch (Exception e) {
+            log.error("[{}] Fetch failed: {}", getPlatform(), e.getMessage(), e);
             return Collections.emptyList();
         }
     }

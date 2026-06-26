@@ -26,16 +26,19 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     private final OAuth2AuthorizedClientService authorizedClientService;
     private final UserService userService;
     private final JwtUtil jwtUtil;
+    private final AuthTokenStore authTokenStore;
 
     @Value("${app.frontend.url:https://cp-sync-frontend.vercel.app/auth/callback}")
     private String frontendCallbackUrl;
 
     public OAuth2LoginSuccessHandler(OAuth2AuthorizedClientService authorizedClientService,
                                      UserService userService,
-                                     JwtUtil jwtUtil) {
+                                     JwtUtil jwtUtil,
+                                     AuthTokenStore authTokenStore) {
         this.authorizedClientService = authorizedClientService;
         this.userService = userService;
         this.jwtUtil = jwtUtil;
+        this.authTokenStore = authTokenStore;
     }
 
     @Override
@@ -62,9 +65,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
                 : null;
 
         User savedUser = userService.upsertUserFromLogin(
-                googleId,
-                email,
-                name,
+                googleId, email, name,
                 accessToken.getTokenValue(),
                 refreshToken != null ? refreshToken.getTokenValue() : null,
                 tokenExpiry
@@ -72,6 +73,10 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
         String jwt = jwtUtil.generateToken(savedUser.getId(), savedUser.getEmail());
 
-        response.sendRedirect(frontendCallbackUrl + "?token=" + jwt);
+        // FIXED: redirect with a short-lived one-time CODE, not the JWT itself.
+        // The frontend exchanges this code for the JWT via POST /api/auth/exchange.
+        // The JWT never appears in browser history, logs, or Referer headers.
+        String code = authTokenStore.generateCode(jwt);
+        response.sendRedirect(frontendCallbackUrl + "?code=" + code);
     }
 }

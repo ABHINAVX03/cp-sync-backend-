@@ -2,14 +2,15 @@ package com.cpsync.cpsync_backend.controller;
 
 import com.cpsync.cpsync_backend.dto.response.UserProfileResponse;
 import com.cpsync.cpsync_backend.model.AccessRequest;
-import com.cpsync.cpsync_backend.repository.AccessRequestRepository;
-import com.cpsync.cpsync_backend.service.EmailService;
+import com.cpsync.cpsync_backend.service.AdminService;
 import com.cpsync.cpsync_backend.service.UserService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -17,25 +18,22 @@ import java.util.Map;
 @RequestMapping("/api/admin")
 public class AdminController {
 
-    private static final String ADMIN_EMAIL = "guptaabhinav697@gmail.com";
+    @Value("${app.admin-email}")
+    private String adminEmail;
 
     private final UserService userService;
-    private final AccessRequestRepository accessRequestRepository;
-    private final EmailService emailService;
+    private final AdminService adminService;
 
-    public AdminController(UserService userService,
-                           AccessRequestRepository accessRequestRepository,
-                           EmailService emailService) {
+    public AdminController(UserService userService, AdminService adminService) {
         this.userService = userService;
-        this.accessRequestRepository = accessRequestRepository;
-        this.emailService = emailService;
+        this.adminService = adminService;
     }
 
     private void requireAdmin(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
         String email = userService.getEmailById(userId);
-        if (!ADMIN_EMAIL.equals(email)) {
-            throw new RuntimeException("Access denied");
+        if (!adminEmail.equals(email)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
         }
     }
 
@@ -48,49 +46,27 @@ public class AdminController {
     @GetMapping("/access-requests")
     public List<AccessRequest> getAccessRequests(Authentication authentication) {
         requireAdmin(authentication);
-        return accessRequestRepository.findAll();
+        return adminService.getAllAccessRequests();
     }
 
     @PostMapping("/approve/{id}")
-    public ResponseEntity<?> approveRequest(@PathVariable Long id, Authentication authentication) {
+    public ResponseEntity<Map<String, String>> approveRequest(@PathVariable Long id,
+                                                              Authentication authentication) {
         requireAdmin(authentication);
-
-        AccessRequest request = accessRequestRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Request not found"));
-
-        if (request.getApprovedAt() != null) {
-            return ResponseEntity.ok(Map.of("message", "Already approved"));
-        }
-
-        // Mark as approved
-        request.setApprovedAt(LocalDateTime.now());
-        accessRequestRepository.save(request);
-
-        // Send welcome email
-        emailService.sendWelcomeEmail(request.getEmail());
-
-        return ResponseEntity.ok(Map.of("message", "Approved, email sent to " + request.getEmail()));
+        String message = adminService.approveById(id);
+        return ResponseEntity.ok(Map.of("message", message));
     }
 
     @PostMapping("/manual-approve")
-    public ResponseEntity<?> manualApprove(@RequestBody Map<String, String> body, Authentication authentication) {
+    public ResponseEntity<Map<String, String>> manualApprove(
+            @RequestBody Map<String, String> body,
+            Authentication authentication) {
         requireAdmin(authentication);
         String email = body.get("email");
         if (email == null || !email.contains("@")) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid email"));
         }
-
-        // Check if already in access_requests
-        AccessRequest request = accessRequestRepository.findByEmail(email)
-                .orElseGet(() -> {
-                    AccessRequest newReq = new AccessRequest();
-                    newReq.setEmail(email);
-                    return newReq;
-                });
-        request.setApprovedAt(LocalDateTime.now());
-        accessRequestRepository.save(request);
-
-        emailService.sendWelcomeEmail(email);
+        adminService.approveByEmail(email);
         return ResponseEntity.ok(Map.of("message", "Approved, email sent"));
     }
 }

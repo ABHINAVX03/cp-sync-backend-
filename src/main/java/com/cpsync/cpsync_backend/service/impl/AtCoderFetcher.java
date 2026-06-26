@@ -7,6 +7,8 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.cache.annotation.Cacheable;
 import java.time.Instant;
@@ -20,6 +22,7 @@ import java.util.List;
 public class AtCoderFetcher implements ContestFetcher {
 
     private static final String URL = "https://atcoder.jp/contests/?lang=en";
+    private static final Logger log = LoggerFactory.getLogger(AtCoderFetcher.class);
 
     // AtCoder time format: "2026-06-21 19:00:00+0900"
     private static final DateTimeFormatter START_FORMAT =
@@ -70,6 +73,7 @@ public class AtCoderFetcher implements ContestFetcher {
                     OffsetDateTime odt = OffsetDateTime.parse(startStr, START_FORMAT);
                     startTime = odt.toInstant();
                 } catch (Exception e) {
+                    log.error("[{}] Fetch failed: {}", getPlatform(), e.getMessage(), e);
                     continue; // skip unparsable row
                 }
 
@@ -80,6 +84,7 @@ public class AtCoderFetcher implements ContestFetcher {
                     long minutes = Long.parseLong(parts[1]);
                     durationSeconds = (hours * 3600) + (minutes * 60);
                 } catch (Exception e) {
+                    log.error("[{}] Fetch failed: {}", getPlatform(), e.getMessage(), e);
                     durationSeconds = 2 * 3600; // fallback: 2 hours
                 }
 
@@ -99,6 +104,7 @@ public class AtCoderFetcher implements ContestFetcher {
             return contests;
 
         } catch (Exception e) {
+            log.error("[{}] Fetch failed: {}", getPlatform(), e.getMessage(), e);
             return Collections.emptyList();
         }
     }
