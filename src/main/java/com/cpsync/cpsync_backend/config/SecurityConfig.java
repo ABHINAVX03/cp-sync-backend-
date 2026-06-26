@@ -3,6 +3,7 @@ package com.cpsync.cpsync_backend.config;
 import com.cpsync.cpsync_backend.security.JwtAuthFilter;
 import com.cpsync.cpsync_backend.security.OAuth2LoginSuccessHandler;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.server.servlet.CookieSameSiteSupplier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -10,6 +11,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.savedrequest.CookieRequestCache;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -36,7 +38,13 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
+                // IF_REQUIRED: Spring creates a session for the OAuth2 state parameter.
+                // The session cookie is set to SameSite=None;Secure via cookieSameSiteSupplier()
+                // so it survives the cross-site redirect back from Google.
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                // Store the pre-login destination in a cookie (not session) so it
+                // survives the cross-site redirect without needing a session lookup.
+                .requestCache(cache -> cache.requestCache(new CookieRequestCache()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/oauth2/**", "/login/**").permitAll()
                         .requestMatchers("/api/contests/**").permitAll()
@@ -56,6 +64,17 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    /**
+     * Forces the JSESSIONID cookie to SameSite=None;Secure.
+     * Without this, Chrome/Firefox block the session cookie on the cross-site
+     * redirect from accounts.google.com → cp-sync-backend.onrender.com,
+     * causing Spring Security to lose the OAuth2 state and return login?error.
+     */
+    @Bean
+    public CookieSameSiteSupplier cookieSameSiteSupplier() {
+        return CookieSameSiteSupplier.ofNone().whenHasName("JSESSIONID");
     }
 
     @Bean
