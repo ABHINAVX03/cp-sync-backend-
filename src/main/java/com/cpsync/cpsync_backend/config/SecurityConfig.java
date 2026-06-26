@@ -16,11 +16,17 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 
 @Configuration
 public class SecurityConfig {
+
+    private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
 
     private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
     private final JwtAuthFilter jwtAuthFilter;
@@ -60,6 +66,11 @@ public class SecurityConfig {
                                 )
                         )
                         .successHandler(oAuth2LoginSuccessHandler)
+                        .failureHandler((req, res, exp) -> {
+                            logger.error("OAuth2 Login Failed: {}", exp.getMessage(), exp);
+                            String errMsg = exp.getMessage() != null ? exp.getMessage() : "Unknown OAuth2 error";
+                            res.sendRedirect(req.getContextPath() + "/login?error=" + URLEncoder.encode(errMsg, StandardCharsets.UTF_8));
+                        })
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
