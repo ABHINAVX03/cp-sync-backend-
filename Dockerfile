@@ -15,24 +15,21 @@ EXPOSE 8080
 
 # ── JVM memory budget for Render free tier (512MB hard limit) ──────────────────
 # Heap:              -Xms48m -Xmx192m      → 192MB max heap
-# Metaspace cap:     -XX:MaxMetaspaceSize=96m
-# Code cache cap:    -XX:ReservedCodeCacheSize=48m
+# Metaspace cap:     -XX:MaxMetaspaceSize=128m
+# Code cache cap:    -XX:ReservedCodeCacheSize=64m
 # Class space:       -XX:CompressedClassSpaceSize=32m
 # Thread stacks:     -Xss256k (default 512k → halved)
 # GC:                SerialGC — lowest overhead for a single-tenant 0.1-CPU container.
-#                    ZGC was consuming ~60MB extra in native memory and has higher
-#                    reservation overhead on small heaps.
 # JIT:               TieredStopAtLevel=1 — only the fast-tier compiler runs.
-#                    Avoids the C2 JIT compiler which spikes peak startup memory.
 # JMX disabled:      Saves ~10MB of MBean infrastructure we don't use.
 #
-# Estimated total:   192 + 96 + 48 + 32 + ~30 (native/threads) = ~398MB  ✓
+# Estimated total:   192 + 128 + 64 + 32 + ~30 (native/threads) = ~446MB  ✓
 ENTRYPOINT ["java", \
     "-Xms48m", \
     "-Xmx192m", \
     "-XX:+UseSerialGC", \
-    "-XX:MaxMetaspaceSize=96m", \
-    "-XX:ReservedCodeCacheSize=48m", \
+    "-XX:MaxMetaspaceSize=128m", \
+    "-XX:ReservedCodeCacheSize=64m", \
     "-XX:CompressedClassSpaceSize=32m", \
     "-Xss256k", \
     "-XX:TieredStopAtLevel=1", \
