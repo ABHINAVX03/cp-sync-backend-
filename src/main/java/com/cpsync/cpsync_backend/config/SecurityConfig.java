@@ -44,16 +44,12 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
-                // IF_REQUIRED: Spring creates a session for the OAuth2 state parameter.
-                // The session cookie is set to SameSite=None;Secure via cookieSameSiteSupplier()
-                // so it survives the cross-site redirect back from Google.
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
-                // Store the pre-login destination in a cookie (not session) so it
-                // survives the cross-site redirect without needing a session lookup.
                 .requestCache(cache -> cache.requestCache(new CookieRequestCache()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/oauth2/**", "/login/**").permitAll()
-                        .requestMatchers("/api/contests/**").permitAll()
+                        // Only the exact /api/contests (GET) is public – the /mine variant requires auth
+                        .requestMatchers("/api/contests").permitAll()
                         .requestMatchers("/api/request-access").permitAll()
                         .requestMatchers("/api/auth/exchange").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
@@ -77,12 +73,6 @@ public class SecurityConfig {
         return http.build();
     }
 
-    /**
-     * Forces the JSESSIONID cookie to SameSite=None;Secure.
-     * Without this, Chrome/Firefox block the session cookie on the cross-site
-     * redirect from accounts.google.com → cp-sync-backend.onrender.com,
-     * causing Spring Security to lose the OAuth2 state and return login?error.
-     */
     @Bean
     public CookieSameSiteSupplier cookieSameSiteSupplier() {
         return CookieSameSiteSupplier.ofNone().whenHasName("JSESSIONID");
