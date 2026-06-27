@@ -14,8 +14,8 @@ COPY --from=build /app/target/cpsync-backend-*.jar app.jar
 EXPOSE 8080
 
 # ── JVM memory budget for Render free tier (512MB hard limit) ──────────────────
-# Heap:              -Xms48m -Xmx192m      → 192MB max heap
-# Metaspace cap:     -XX:MaxMetaspaceSize=128m
+# Heap:              -Xms64m -Xmx160m      → 160MB max heap
+# Metaspace cap:     -XX:MaxMetaspaceSize=160m
 # Code cache cap:    -XX:ReservedCodeCacheSize=64m
 # Class space:       -XX:CompressedClassSpaceSize=32m
 # Thread stacks:     -Xss256k (default 512k → halved)
@@ -23,12 +23,12 @@ EXPOSE 8080
 # JIT:               TieredStopAtLevel=1 — only the fast-tier compiler runs.
 # JMX disabled:      Saves ~10MB of MBean infrastructure we don't use.
 #
-# Estimated total:   192 + 128 + 64 + 32 + ~30 (native/threads) = ~446MB  ✓
+# Estimated total:   160 + 160 + 64 + 32 + ~30 (native/threads) ≈ 446MB  ✓
 ENTRYPOINT ["java", \
-    "-Xms48m", \
-    "-Xmx192m", \
+    "-Xms64m", \
+    "-Xmx160m", \
     "-XX:+UseSerialGC", \
-    "-XX:MaxMetaspaceSize=128m", \
+    "-XX:MaxMetaspaceSize=160m", \
     "-XX:ReservedCodeCacheSize=64m", \
     "-XX:CompressedClassSpaceSize=32m", \
     "-Xss256k", \
