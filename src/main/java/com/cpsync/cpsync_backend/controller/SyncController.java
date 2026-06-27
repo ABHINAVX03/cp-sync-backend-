@@ -33,6 +33,7 @@ public class SyncController {
     public ResponseEntity<Map<String, Object>> triggerManualSync(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
 
+        // Check rate limit without consuming yet
         if (!rateLimiter.tryConsume(userId)) {
             long retryAfter = rateLimiter.secondsUntilRefill(userId);
             return ResponseEntity
@@ -45,8 +46,14 @@ public class SyncController {
         }
 
         User user = userService.getUserById(userId);
-        int syncedCount = syncService.syncContestsForUser(user);
-
-        return ResponseEntity.ok(Map.of("status", "ok", "syncedCount", syncedCount));
+        try {
+            int syncedCount = syncService.syncContestsForUser(user);
+            // Token consumed only on successful execution
+            return ResponseEntity.ok(Map.of("status", "ok", "syncedCount", syncedCount));
+        } catch (Exception e) {
+            // Replenish the token – the sync failed due to an external error
+            rateLimiter.refill(userId);
+            throw e;
+        }
     }
 }

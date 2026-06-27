@@ -37,6 +37,12 @@ public class GlobalExceptionHandler {
         return body(HttpStatus.valueOf(e.getStatusCode().value()), e.getReason(), null);
     }
 
+    /** Business rule violations — 400 Bad Request */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException e) {
+        return body(HttpStatus.BAD_REQUEST, e.getMessage(), null);
+    }
+
     /** Business rule violations — 409 Conflict */
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException e) {
@@ -47,7 +53,6 @@ public class GlobalExceptionHandler {
     /** Catch-all — NEVER expose internal details */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneric(Exception e) {
-        // Log full stack trace internally, return safe message externally
         log.error("Unhandled exception", e);
         return body(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred", null);
     }

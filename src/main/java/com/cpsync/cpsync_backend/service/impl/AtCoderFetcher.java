@@ -24,7 +24,6 @@ public class AtCoderFetcher implements ContestFetcher {
     private static final String URL = "https://atcoder.jp/contests/?lang=en";
     private static final Logger log = LoggerFactory.getLogger(AtCoderFetcher.class);
 
-    // AtCoder time format: "2026-06-21 19:00:00+0900"
     private static final DateTimeFormatter START_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssXX");
 
@@ -33,9 +32,8 @@ public class AtCoderFetcher implements ContestFetcher {
         return Platform.ATCODER;
     }
 
-
     @Override
-    @Cacheable(value = "atcoderContests", unless = "#result.isEmpty()")
+    @Cacheable(value = "atcoderContests", unless = "#result.isEmpty()", sync = true)
     public List<ContestDto> fetchUpcomingContests() {
         try {
             Document doc = Jsoup.connect(URL)
@@ -51,7 +49,6 @@ public class AtCoderFetcher implements ContestFetcher {
             List<ContestDto> contests = new ArrayList<>();
             Elements rows = upcomingDiv.select("tr");
 
-            // skip header row (index 0)
             for (int i = 1; i < rows.size(); i++) {
                 Element row = rows.get(i);
                 Elements cols = row.select("td");
@@ -66,15 +63,15 @@ public class AtCoderFetcher implements ContestFetcher {
                 String name = link.text().trim();
                 String contestUrl = "https://atcoder.jp" + link.attr("href");
 
-                String durationStr = cols.get(2).text().trim(); // "04:00"
+                String durationStr = cols.get(2).text().trim();
 
                 Instant startTime;
                 try {
                     OffsetDateTime odt = OffsetDateTime.parse(startStr, START_FORMAT);
                     startTime = odt.toInstant();
                 } catch (Exception e) {
-                    log.error("[{}] Fetch failed: {}", getPlatform(), e.getMessage(), e);
-                    continue; // skip unparsable row
+                    log.error("[{}] Failed to parse start time: {}", getPlatform(), startStr, e);
+                    continue;
                 }
 
                 long durationSeconds;
@@ -84,11 +81,9 @@ public class AtCoderFetcher implements ContestFetcher {
                     long minutes = Long.parseLong(parts[1]);
                     durationSeconds = (hours * 3600) + (minutes * 60);
                 } catch (Exception e) {
-                    log.error("[{}] Fetch failed: {}", getPlatform(), e.getMessage(), e);
-                    durationSeconds = 2 * 3600; // fallback: 2 hours
+                    durationSeconds = 2 * 3600; // fallback
                 }
 
-                // contest ID from URL, e.g. "/contests/abc123" -> "abc123"
                 String contestId = contestUrl.substring(contestUrl.lastIndexOf("/") + 1);
 
                 contests.add(new ContestDto(

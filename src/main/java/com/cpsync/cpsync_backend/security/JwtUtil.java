@@ -25,12 +25,17 @@ public class JwtUtil {
     }
 
     public String generateToken(Long userId, String email) {
+        return generateToken(userId, email, "USER");
+    }
+
+    public String generateToken(Long userId, String email, String role) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMs);
 
         return Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("email", email)
+                .claim("role", role)   // <--- FIXED: frontend now sees admin flag
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(signingKey, Jwts.SIG.HS256)
@@ -44,6 +49,10 @@ public class JwtUtil {
 
     public String extractEmail(String token) {
         return parseClaims(token).get("email", String.class);
+    }
+
+    public String extractRole(String token) {
+        return parseClaims(token).get("role", String.class);
     }
 
     public boolean isTokenValid(String token) {

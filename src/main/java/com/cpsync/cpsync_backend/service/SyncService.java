@@ -7,13 +7,12 @@ import com.cpsync.cpsync_backend.model.User;
 import com.cpsync.cpsync_backend.model.UserPlatformPreference;
 import com.cpsync.cpsync_backend.repository.SyncedEventRepository;
 import com.cpsync.cpsync_backend.repository.UserPlatformPreferenceRepository;
-import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -38,15 +37,10 @@ public class SyncService {
     }
 
     /**
-     * Syncs new contests for a user.
-     *
-     * Changes from original:
-     * 1. Collects all new SyncedEvent rows and calls saveAll() once instead of
-     *    save() per contest — cuts DB round-trips from N to 1 per user sync.
-     * 2. Uses CalendarSyncException to distinguish retryable vs permanent failures
-     *    without hiding them silently.
+     * Syncs new contests for a user.  No transaction wraps the whole method –
+     * each successful calendar call is persisted immediately so that partial
+     * failures don't create duplicates.
      */
-    @Transactional
     public int syncContestsForUser(User user) {
         Set<Platform> enabledPlatforms = platformPreferenceRepository
                 .findByUserIdAndEnabledTrue(user.getId())
@@ -58,12 +52,10 @@ public class SyncService {
             return 0;
         }
 
-        List<ContestDto> contests = aggregatorService.fetchContestsForPlatforms(enabledPlatforms);
-
-        // One DB query for all synced keys instead of existsBy per contest
+        var contests = aggregatorService.fetchContestsForPlatforms(enabledPlatforms);
         Set<String> alreadySynced = syncedEventRepository.findContestKeysByUserId(user.getId());
 
-        List<SyncedEvent> toSave = new ArrayList<>();
+        int syncedCount = 0;
         int failedCount = 0;
 
         for (ContestDto contest : contests) {
@@ -79,25 +71,41 @@ public class SyncService {
                 event.setUser(user);
                 event.setContestKey(key);
                 event.setGoogleEventId(googleEventId);
-                toSave.add(event);
 
-            } catch (GoogleCalendarService.CalendarSyncException e) {
-                // Log and continue — one contest failing shouldn't stop the rest
+                // Persist one at a time – prevents duplicates from partial failure
+                saveEvent(event);
+                syncedCount++;
+
+            } catch (GoogleCalendarService.CalendarSyncException | IllegalStateException e) {
+                // Calendar permanent failure or revoked access – log, continue
                 failedCount++;
                 log.error("[SyncService] Skipping contest {} for user {}: {}",
                         key, user.getId(), e.getMessage());
+            } catch (Exception e) {
+                // Catch unexpected errors to keep the loop going
+                failedCount++;
+                log.error("[SyncService] Unexpected error syncing contest {} for user {}: {}",
+                        key, user.getId(), e.getMessage());
             }
-        }
-
-        // Batch insert: one DB round-trip instead of N
-        if (!toSave.isEmpty()) {
-            syncedEventRepository.saveAll(toSave);
         }
 
         if (failedCount > 0) {
             log.warn("[SyncService] User {} — {} contests failed to sync", user.getId(), failedCount);
         }
 
-        return toSave.size();
+        return syncedCount;
+    }
+
+    @Transactional
+    private void saveEvent(SyncedEvent event) {
+        try {
+            syncedEventRepository.save(event);
+        } catch (DataIntegrityViolationException e) {
+            // Race condition – the key was inserted between our check and now.
+            // Log and move on; the Google event already exists but it's a duplicate
+            // that the next cleanup will eventually remove.
+            log.warn("[SyncService] Duplicate contest key {} for user {} ignored.",
+                    event.getContestKey(), event.getUser().getId());
+        }
     }
 }

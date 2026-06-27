@@ -33,15 +33,17 @@ public class AccessRequestController {
 
         String email = dto.getEmail();
 
+        // Unified response to prevent email enumeration
+        String genericMessage = "If your email is eligible, you'll hear from us shortly.";
+
         if (userRepository.findByEmail(email).isPresent()) {
-            return ResponseEntity.ok(
-                    Map.of("message", "You're already an active user. Please sign in directly."));
+            // Already a user – no indication given, just generic.
+            return ResponseEntity.ok(Map.of("message", genericMessage));
         }
 
         if (accessRequestRepository.existsByEmail(email)) {
-            return ResponseEntity
-                    .status(HttpStatus.CONFLICT)
-                    .body(Map.of("message", "You've already requested access. We'll activate your account soon."));
+            // Already requested – still same message.
+            return ResponseEntity.ok(Map.of("message", genericMessage));
         }
 
         try {
@@ -49,13 +51,11 @@ public class AccessRequestController {
             request.setEmail(email);
             accessRequestRepository.save(request);
         } catch (DataIntegrityViolationException e) {
-            return ResponseEntity
-                    .status(HttpStatus.CONFLICT)
-                    .body(Map.of("message", "You've already requested access. We'll activate your account soon."));
+            // Concurrent request – fine, ignore.
+            return ResponseEntity.ok(Map.of("message", genericMessage));
         }
 
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(Map.of("message", "Your request has been received. We'll activate your account within 12 hours."));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(Map.of("message", genericMessage));
     }
 }

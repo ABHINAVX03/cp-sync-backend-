@@ -34,7 +34,7 @@ public class CodeforcesFetcher implements ContestFetcher {
     }
 
     @Override
-    @Cacheable(value = "codeforcesContests", unless = "#result.isEmpty()")
+    @Cacheable(value = "codeforcesContests", unless = "#result.isEmpty()", sync = true)
     public List<ContestDto> fetchUpcomingContests() {
         try {
             String response = restClient.get()
@@ -69,8 +69,6 @@ public class CodeforcesFetcher implements ContestFetcher {
                 "https://codeforces.com/contest/" + c.id
         );
     }
-
-    // --- Internal DTOs matching Codeforces API JSON shape ---
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private static class CodeforcesApiResponse {

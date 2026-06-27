@@ -32,6 +32,14 @@ public class SyncRateLimiter {
         return bucket.tryConsume(1);
     }
 
+    /** Give back a token when a sync fails for reasons outside the user's control. */
+    public void refill(Long userId) {
+        Bucket bucket = buckets.getIfPresent(userId);
+        if (bucket != null) {
+            bucket.addTokens(1);
+        }
+    }
+
     public long secondsUntilRefill(Long userId) {
         Bucket bucket = buckets.getIfPresent(userId);
         if (bucket == null || bucket.getAvailableTokens() > 0) return 0;

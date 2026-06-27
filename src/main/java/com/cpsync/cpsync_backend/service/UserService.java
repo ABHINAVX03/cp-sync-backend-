@@ -22,13 +22,16 @@ public class UserService {
     private final UserPlatformPreferenceRepository platformPreferenceRepository;
     private final TokenEncryptionService tokenEncryptionService;
 
-
     public UserService(UserRepository userRepository,
                        UserPlatformPreferenceRepository platformPreferenceRepository,
                        TokenEncryptionService tokenEncryptionService) {
         this.userRepository = userRepository;
         this.platformPreferenceRepository = platformPreferenceRepository;
         this.tokenEncryptionService = tokenEncryptionService;
+    }
+
+    public boolean existsByEmail(String email) {
+        return userRepository.findByEmail(email).isPresent();
     }
 
     @Transactional
@@ -94,7 +97,6 @@ public class UserService {
                 .collect(Collectors.toList());
 
         // Disable everything first, then enable only what was requested.
-        // Simpler and safer than trying to diff add/remove.
         List<UserPlatformPreference> existingPrefs = platformPreferenceRepository.findByUserId(userId);
 
         for (UserPlatformPreference pref : existingPrefs) {

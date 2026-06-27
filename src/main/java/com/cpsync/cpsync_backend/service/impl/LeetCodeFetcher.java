@@ -47,7 +47,7 @@ public class LeetCodeFetcher implements ContestFetcher {
     }
 
     @Override
-    @Cacheable(value = "leetcodeContests", unless = "#result.isEmpty()")
+    @Cacheable(value = "leetcodeContests", unless = "#result.isEmpty()", sync = true)
     public List<ContestDto> fetchUpcomingContests() {
         try {
             String response = restClient.post()

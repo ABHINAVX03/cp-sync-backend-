@@ -2,8 +2,9 @@ package com.cpsync.cpsync_backend.service;
 
 import com.cpsync.cpsync_backend.model.User;
 import com.cpsync.cpsync_backend.repository.UserRepository;
+import com.cpsync.cpsync_backend.security.UserDenyList;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -20,9 +21,9 @@ public class GoogleTokenRefreshService {
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
-
     private final UserRepository userRepository;
     private final TokenEncryptionService tokenEncryptionService;
+    private final UserDenyList userDenyList;
     private final String clientId;
     private final String clientSecret;
 
@@ -32,23 +33,24 @@ public class GoogleTokenRefreshService {
             TokenEncryptionService tokenEncryptionService,
             ObjectMapper objectMapper,
             @Value("${spring.security.oauth2.client.registration.google.client-id}") String clientId,
-            @Value("${spring.security.oauth2.client.registration.google.client-secret}") String clientSecret
-    ) {
+            @Value("${spring.security.oauth2.client.registration.google.client-secret}") String clientSecret,
+            UserDenyList userDenyList) {
         this.restClient = restClientBuilder.build();
         this.userRepository = userRepository;
         this.tokenEncryptionService = tokenEncryptionService;
         this.objectMapper = objectMapper;
         this.clientId = clientId;
         this.clientSecret = clientSecret;
+        this.userDenyList = userDenyList;
     }
 
     /**
      * Returns a valid, decrypted access token for this user — refreshing it first if expired.
-     * Throws if the user has no refresh token (shouldn't happen if login flow worked correctly).
+     * Throws if the user has no refresh token.
      */
     public String getValidAccessToken(User user) {
         boolean isExpired = user.getTokenExpiry() == null
-                || user.getTokenExpiry().isBefore(LocalDateTime.now().plusMinutes(2)); // 2-min buffer
+                || user.getTokenExpiry().isBefore(LocalDateTime.now().plusMinutes(2));
 
         if (!isExpired) {
             return tokenEncryptionService.decrypt(user.getAccessToken());
@@ -89,8 +91,10 @@ public class GoogleTokenRefreshService {
             return parsed.accessToken;
 
         } catch (org.springframework.web.client.HttpClientErrorException.BadRequest e) {
+            // User revoked calendar access — deactivate and deny list
             user.setActive(false);
             userRepository.save(user);
+            userDenyList.deny(user.getId());                // <--- FIXED: keep deny list consistent
             throw new IllegalStateException("User " + user.getId() + " revoked calendar access — account paused automatically.");
         } catch (Exception e) {
             throw new RuntimeException("Token refresh failed for user " + user.getId(), e);
@@ -101,7 +105,6 @@ public class GoogleTokenRefreshService {
     private static class TokenRefreshResponse {
         @com.fasterxml.jackson.annotation.JsonProperty("access_token")
         public String accessToken;
-
         @com.fasterxml.jackson.annotation.JsonProperty("expires_in")
         public long expiresIn;
     }

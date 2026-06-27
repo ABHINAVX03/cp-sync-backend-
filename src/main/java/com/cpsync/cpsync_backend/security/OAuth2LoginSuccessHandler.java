@@ -1,6 +1,7 @@
 package com.cpsync.cpsync_backend.security;
 
 import com.cpsync.cpsync_backend.model.User;
+import com.cpsync.cpsync_backend.repository.AccessRequestRepository;
 import com.cpsync.cpsync_backend.service.UserService;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,18 +28,24 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     private final UserService userService;
     private final JwtUtil jwtUtil;
     private final AuthTokenStore authTokenStore;
+    private final AccessRequestRepository accessRequestRepository;
 
     @Value("${app.frontend.url:https://cp-sync-frontend.vercel.app/auth/callback}")
     private String frontendCallbackUrl;
 
+    @Value("${app.admin-email}")
+    private String adminEmail;
+
     public OAuth2LoginSuccessHandler(OAuth2AuthorizedClientService authorizedClientService,
                                      UserService userService,
                                      JwtUtil jwtUtil,
-                                     AuthTokenStore authTokenStore) {
+                                     AuthTokenStore authTokenStore,
+                                     AccessRequestRepository accessRequestRepository) {
         this.authorizedClientService = authorizedClientService;
         this.userService = userService;
         this.jwtUtil = jwtUtil;
         this.authTokenStore = authTokenStore;
+        this.accessRequestRepository = accessRequestRepository;
     }
 
     @Override
@@ -60,6 +67,16 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         String email = oauth2User.getAttribute("email");
         String name = oauth2User.getAttribute("name");
 
+        // Access control: only allow users who have been approved in access_requests,
+        // unless they already exist (i.e. previously logged in before the gate).
+        if (!userService.existsByEmail(email) &&
+                !accessRequestRepository.findByEmail(email)
+                        .map(r -> r.getApprovedAt() != null)
+                        .orElse(false)) {
+            response.sendRedirect(frontendCallbackUrl + "?error=not_approved");
+            return;
+        }
+
         LocalDateTime tokenExpiry = accessToken.getExpiresAt() != null
                 ? LocalDateTime.ofInstant(accessToken.getExpiresAt(), ZoneOffset.UTC)
                 : null;
@@ -71,11 +88,11 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
                 tokenExpiry
         );
 
-        String jwt = jwtUtil.generateToken(savedUser.getId(), savedUser.getEmail());
+        // Determine role for JWT claim (used by frontend to show Admin nav)
+        String role = adminEmail.equals(email) ? "ADMIN" : "USER";
+        String jwt = jwtUtil.generateToken(savedUser.getId(), savedUser.getEmail(), role);
 
         // FIXED: redirect with a short-lived one-time CODE, not the JWT itself.
-        // The frontend exchanges this code for the JWT via POST /api/auth/exchange.
-        // The JWT never appears in browser history, logs, or Referer headers.
         String code = authTokenStore.generateCode(jwt);
         response.sendRedirect(frontendCallbackUrl + "?code=" + code);
     }

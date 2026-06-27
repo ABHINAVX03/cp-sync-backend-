@@ -47,6 +47,12 @@ public class AdminService {
                     r.setEmail(email);
                     return r;
                 });
+
+        // Idempotency: only approve and send email once
+        if (request.getApprovedAt() != null) {
+            return;
+        }
+
         request.setApprovedAt(LocalDateTime.now());
         accessRequestRepository.save(request);
         emailService.sendWelcomeEmail(email);
