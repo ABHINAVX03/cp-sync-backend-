@@ -33,7 +33,7 @@ public class AtCoderFetcher implements ContestFetcher {
     }
 
     @Override
-    @Cacheable(value = "atcoderContests", unless = "#result.isEmpty()", sync = true)
+    @Cacheable(value = "atcoderContests", sync = true)
     public List<ContestDto> fetchUpcomingContests() {
         try {
             Document doc = Jsoup.connect(URL)

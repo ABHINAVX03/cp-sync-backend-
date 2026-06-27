@@ -34,7 +34,7 @@ public class CodeforcesFetcher implements ContestFetcher {
     }
 
     @Override
-    @Cacheable(value = "codeforcesContests", unless = "#result.isEmpty()", sync = true)
+    @Cacheable(value = "codeforcesContests", sync = true)
     public List<ContestDto> fetchUpcomingContests() {
         try {
             String response = restClient.get()
