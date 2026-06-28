@@ -1,5 +1,8 @@
 package com.cpsync.cpsync_backend.security;
 
+import com.cpsync.cpsync_backend.repository.UserRepository;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,17 +13,25 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Collections;
 
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
-    private final UserDenyList userDenyList;
+    private final UserRepository userRepository;
 
-    public JwtAuthFilter(JwtUtil jwtUtil, UserDenyList userDenyList) {
+    // Cache the active/inactive status for 30 seconds – cheap enough to not hit DB every request,
+    // short enough that a pause/resume is reflected quickly.
+    private final Cache<Long, Boolean> activeCache = Caffeine.newBuilder()
+            .expireAfterWrite(Duration.ofSeconds(30))
+            .maximumSize(10_000)
+            .build();
+
+    public JwtAuthFilter(JwtUtil jwtUtil, UserRepository userRepository) {
         this.jwtUtil = jwtUtil;
-        this.userDenyList = userDenyList;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -35,8 +46,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             if (jwtUtil.isTokenValid(token)) {
                 Long userId = jwtUtil.extractUserId(token);
 
-                // FIXED: reject tokens belonging to deactivated users
-                if (!userDenyList.isDenied(userId)) {
+                // Check active status via cache (reads DB on miss)
+                boolean active = activeCache.get(userId, id ->
+                        userRepository.findById(id).map(u -> u.isActive()).orElse(false));
+
+                if (active) {
                     var authToken = new UsernamePasswordAuthenticationToken(
                             userId,
                             null,

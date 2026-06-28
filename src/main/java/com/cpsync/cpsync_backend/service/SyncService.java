@@ -11,7 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -37,9 +36,9 @@ public class SyncService {
     }
 
     /**
-     * Syncs new contests for a user.  No transaction wraps the whole method –
-     * each successful calendar call is persisted immediately so that partial
-     * failures don't create duplicates.
+     * Syncs new contests for a user.  Uses the unique constraint on
+     * synced_events as an atomic lock – the row is created BEFORE the
+     * Google Calendar call, so concurrent syncs never create duplicates.
      */
     public int syncContestsForUser(User user) {
         Set<Platform> enabledPlatforms = platformPreferenceRepository
@@ -64,27 +63,35 @@ public class SyncService {
                 continue;
             }
 
+            // 1) Placeholder – atomic claim via the unique constraint
+            SyncedEvent placeholder = new SyncedEvent();
+            placeholder.setUser(user);
+            placeholder.setContestKey(key);
+            placeholder.setGoogleEventId(null);   // not created yet
+
+            try {
+                syncedEventRepository.save(placeholder);
+            } catch (DataIntegrityViolationException e) {
+                // Another thread already claimed this contest – skip
+                continue;
+            }
+
+            // 2) Now that we've claimed it, do the external call
             try {
                 String googleEventId = calendarService.createContestEvent(user, contest);
-
-                SyncedEvent event = new SyncedEvent();
-                event.setUser(user);
-                event.setContestKey(key);
-                event.setGoogleEventId(googleEventId);
-
-                // Persist one at a time – prevents duplicates from partial failure
-                saveEvent(event);
+                placeholder.setGoogleEventId(googleEventId);
+                syncedEventRepository.save(placeholder);
                 syncedCount++;
-
             } catch (GoogleCalendarService.CalendarSyncException | IllegalStateException e) {
-                // Calendar permanent failure or revoked access – log, continue
+                // Permanent failure – release the claim so we can retry later
+                syncedEventRepository.delete(placeholder);
                 failedCount++;
                 log.error("[SyncService] Skipping contest {} for user {}: {}",
                         key, user.getId(), e.getMessage());
             } catch (Exception e) {
-                // Catch unexpected errors to keep the loop going
+                syncedEventRepository.delete(placeholder);
                 failedCount++;
-                log.error("[SyncService] Unexpected error syncing contest {} for user {}: {}",
+                log.error("[SyncService] Unexpected error for contest {} user {}: {}",
                         key, user.getId(), e.getMessage());
             }
         }
@@ -94,18 +101,5 @@ public class SyncService {
         }
 
         return syncedCount;
-    }
-
-    @Transactional
-    private void saveEvent(SyncedEvent event) {
-        try {
-            syncedEventRepository.save(event);
-        } catch (DataIntegrityViolationException e) {
-            // Race condition – the key was inserted between our check and now.
-            // Log and move on; the Google event already exists but it's a duplicate
-            // that the next cleanup will eventually remove.
-            log.warn("[SyncService] Duplicate contest key {} for user {} ignored.",
-                    event.getContestKey(), event.getUser().getId());
-        }
     }
 }
